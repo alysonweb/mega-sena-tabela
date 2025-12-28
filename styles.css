@@ -1,3 +1,4 @@
+/* styles.css */
 * { box-sizing: border-box; }
 
 :root{
@@ -25,7 +26,7 @@ body{
   gap:12px;
 }
 
-.top h1{ margin:0 0 4px 0; font-size: 24px; letter-spacing: .2px; }
+.top h1{ margin:0 0 4px 0; font-size: 24px; }
 .sub{ margin:0; color:var(--muted); }
 
 .meta{ display:flex; align-items:center; }
@@ -38,7 +39,6 @@ body{
   background: rgba(255,255,255,.6);
 }
 
-/* PANEL */
 .panel{
   margin-top:14px;
   background:var(--card);
@@ -90,7 +90,6 @@ body{
   cursor:pointer;
 }
 
-.btn:active{ transform: translateY(1px); }
 .btn-secondary{ background:#fff; }
 
 .btn-primary{
@@ -106,91 +105,83 @@ body{
   min-height: 18px;
 }
 
-/* PASTE CARD */
-.paste-card{
-  margin: 12px 0 14px 0;
-  border: 1px solid rgba(0,0,0,.10);
-  border-radius: 16px;
-  padding: 12px;
-  background: rgba(0,0,0,.02);
+/* GRID (centralizada) */
+.grid-wrap{
+  overflow-x:auto;
+  padding-bottom: 2px;
+  position: relative;
+
+  display:flex;              /* ✅ centraliza */
+  justify-content:center;    /* ✅ centraliza */
 }
 
-.paste-head{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  margin-bottom: 10px;
+/* overlay da média (retângulo roxo por trás da grid) */
+#medianOverlay{
+  position:absolute;
+  inset: 0;
+  pointer-events:none;
+  z-index: 1;
 }
 
-.muted{ color: var(--muted); font-size: 12px; }
-
-#pasteInput{
-  width: 100%;
-  border-radius: 14px;
-  border: 1px solid rgba(0,0,0,.18);
-  padding: 10px 12px;
-  font-size: 14px;
-  resize: vertical;
-  background: #fff;
+.median-rect{
+  border: 2px solid rgba(123, 92, 255, 0.95);
+  border-radius: 22px;
+  background: transparent; /* ✅ sem “manchar” as bolas */
+  box-shadow:
+    0 10px 22px rgba(123, 92, 255, 0.16),
+    inset 0 0 0 1px rgba(255,255,255,0.55);
+  pointer-events: none;
 }
 
-.paste-actions{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  align-items:end;
-  margin-top: 10px;
-}
-
-.check{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size: 13px;
-  color: #222;
-  user-select:none;
-}
-
-.paste-hint{
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-/* GRID */
-.grid-wrap{ overflow-x:auto; padding-bottom: 2px; }
 
 .grid{
+  position: relative;
+  z-index: 2;
+
   display:grid;
-  gap:10px;
+  gap:6px; /* bolas mais próximas */
   touch-action:manipulation;
-  min-width: 340px;
+  width: max-content; /* ✅ permite centralização real */
+  margin: 0 auto;     /* ✅ */
 }
 
+/* ✅ BOLINHAS */
 .cell{
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border: 1.6px solid rgba(0,0,0,.35);
-  border-radius: 16px;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.18);
+
   text-align:center;
-  font-size:20px;
+  font-size:18px;
   font-weight: 900;
-  letter-spacing: .4px;
+
   outline:none;
   background:#fff;
-  box-shadow: 0 2px 10px rgba(0,0,0,.06);
-  transition: transform .06s ease, box-shadow .12s ease;
+
+  box-shadow:
+    inset 0 -3px 0 rgba(0,0,0,.10),
+    0 3px 8px rgba(0,0,0,.12);
+
+  transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease;
 }
 
 .cell:focus{
-  border-color: rgba(0,0,0,.75);
-  box-shadow: 0 0 0 4px rgba(0,0,0,.12), 0 10px 20px rgba(0,0,0,.08);
+  border-color:#000;
+  box-shadow:
+    inset 0 -3px 0 rgba(0,0,0,.15),
+    0 0 0 3px rgba(0,0,0,.16),
+    0 10px 16px rgba(0,0,0,.14);
   transform: translateY(-1px);
 }
 
+/* marcação manual (duplo clique) */
 .cell.marked{
-  border-color:#b30000;
-  box-shadow: 0 0 0 4px rgba(179,0,0,.18), 0 8px 18px rgba(0,0,0,.10);
+  box-shadow:
+    inset 0 -3px 0 rgba(0,0,0,.18),
+    0 0 0 3px rgba(179,0,0,.35),
+    0 10px 16px rgba(0,0,0,.16);
 }
 
 /* CORES */
@@ -199,7 +190,10 @@ body{
 .green  { background:#43a047; color:#fff; }
 .brown  { background:#6d4c41; color:#fff; }
 .blue   { background:#1e88e5; color:#fff; }
-.pink   { background:#d81b60; color:#fff; }
+
+/* ✅ rosa mais clara */
+.pink   { background:#ff5aa5; color:#fff; }
+
 .black  { background:#000;    color:#fff; }
 .gray   { background:#bdbdbd; color:#111; }
 .orange { background:#fb8c00; color:#111; }
@@ -212,14 +206,12 @@ body{
   background:#fff;
   border:1px solid #e6e6e6;
   border-radius: 16px;
-  box-shadow: 0 6px 16px rgba(0,0,0,.05);
 }
 
 .legend-head{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:10px;
 }
 
 .legend h2{ margin:0; font-size:15px; }
@@ -231,7 +223,6 @@ body{
   border-radius:10px;
   cursor:pointer;
   font-weight:800;
-  color:#333;
 }
 
 .legend-body{ margin-top: 10px; }
@@ -252,8 +243,9 @@ body{
   justify-content:center;
   font-weight: 900;
   border: 2px solid rgba(0,0,0,.20);
-  box-shadow: 0 2px 10px rgba(0,0,0,.08);
-  user-select: none;
+  box-shadow:
+    inset 0 -3px 0 rgba(0,0,0,.10),
+    0 2px 10px rgba(0,0,0,.08);
 }
 
 .hint{
@@ -262,29 +254,23 @@ body{
   font-size: 12px;
 }
 
-.foot{ margin-top: 8px; color: var(--muted); }
-
 @media (max-width: 420px){
-  .grid{ gap: 8px; }
-  .cell{ font-size: 18px; border-radius: 14px; }
+  .grid{ gap: 5px; }
+  .cell{ width: 40px; height: 40px; font-size:16px; }
   .mini{ width: 32px; height: 32px; }
 }
 
-/* ====== IMPRESSÃO ====== */
+/* PRINT */
 @media print{
   *{
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  body{ background:#fff; padding: 0; }
+  #controls, .btn-link, .paste-card{ display:none !important; }
   .panel{ box-shadow:none; border: 1px solid #000; }
-  #controls, .foot, .btn-link, .paste-card{ display:none !important; }
-  .wrap{ max-width: none; margin:0; padding: 0; }
-  .grid-wrap{ overflow: visible; }
-  .cell{ box-shadow:none; border: 1px solid #000; }
-  .legend{ box-shadow:none; border:1px solid #000; }
-  .legend-body{ display:block !important; }
+  .cell{ box-shadow:none !important; border: 2px solid #000 !important; }
 }
 
 /* modo impressão: só tabela */
 .print-table-only #legend{ display: none !important; }
+
