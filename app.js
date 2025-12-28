@@ -1,3 +1,6 @@
+// app.js (COMPLETO - v10: faixa roxa maior (insetX/insetY) + alinhada)
+// ✅ Ajuste do tamanho da faixa no bloco "// AJUSTE AQUI"
+
 class StorageRepo {
   constructor(key) { this.key = key; }
   load() {
@@ -14,11 +17,21 @@ class MegaSenaGridApp {
   constructor(storageKey) {
     this.storage = new StorageRepo(storageKey);
 
-    // UI
+
+    // evita salvar no localStorage a cada tecla (reduz travadinhas)
+    this.persistDebounced = (() => {
+      let t = null;
+      return () => {
+        clearTimeout(t);
+        t = setTimeout(() => this.persist(), 200);
+      };
+    })();
     this.gridEl = document.getElementById("grid");
+    this.gridWrapEl = document.getElementById("gridWrap");
+    this.overlayEl = document.getElementById("medianOverlay");
+
     this.rowsEl = document.getElementById("rows");
     this.colsEl = document.getElementById("cols");
-
     this.applyBtn = document.getElementById("apply");
     this.addRowBtn = document.getElementById("addRow");
     this.addColBtn = document.getElementById("addCol");
@@ -29,17 +42,21 @@ class MegaSenaGridApp {
     this.statusEl = document.getElementById("status");
     this.savedInfoEl = document.getElementById("savedInfo");
 
-    // Paste
-    this.pasteInputEl = document.getElementById("pasteInput");
-    this.fillFromPasteBtn = document.getElementById("fillFromPaste");
-    this.extractModeEl = document.getElementById("extractMode");
-    this.includeDateEl = document.getElementById("includeDate");
-    this.appendModeEl = document.getElementById("appendMode");
-
     this.colorByDigit = {
-      0: "white", 1: "red", 2: "yellow", 3: "green", 4: "brown",
-      5: "blue", 6: "pink", 7: "black", 8: "gray", 9: "orange",
+      0: "white",
+      1: "red",
+      2: "yellow",
+      3: "green",
+      4: "brown",
+      5: "blue",
+      6: "pink",
+      7: "black",
+      8: "gray",
+      9: "orange",
     };
+
+    window.addEventListener("resize", () => this.applyCenterHighlight());
+    this.gridWrapEl?.addEventListener("scroll", () => this.applyCenterHighlight(), { passive: true });
 
     this.bindUI();
     this.initLegendToggle();
@@ -47,34 +64,30 @@ class MegaSenaGridApp {
     this.init();
   }
 
-  /* ===== Utils ===== */
   clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
 
   setStatus(msg) {
+    if (!this.statusEl) return;
     this.statusEl.textContent = msg || "";
     clearTimeout(this._statusTimer);
     if (msg) this._statusTimer = setTimeout(() => (this.statusEl.textContent = ""), 1800);
   }
-
-  setSavedInfo(msg) {
-    if (this.savedInfoEl) this.savedInfoEl.textContent = msg;
-  }
+  setSavedInfo(msg) { if (this.savedInfoEl) this.savedInfoEl.textContent = msg; }
 
   getConfig() {
-    const rows = this.clamp(parseInt(this.rowsEl.value, 10) || 5, 1, 200);
-    const cols = this.clamp(parseInt(this.colsEl.value, 10) || 11, 1, 60);
-    this.rowsEl.value = rows;
-    this.colsEl.value = cols;
+    const rows = this.clamp(parseInt(this.rowsEl?.value, 10) || 5, 1, 200);
+    const cols = this.clamp(parseInt(this.colsEl?.value, 10) || 11, 1, 60);
+    if (this.rowsEl) this.rowsEl.value = rows;
+    if (this.colsEl) this.colsEl.value = cols;
     return { rows, cols };
   }
 
   normalizeDigit(value) {
-    const digits = String(value || "").replace(/[^0-9]/g, "");
+    const digits = String(value ?? "").replace(/[^0-9]/g, "");
     if (!digits) return "";
-    return digits[digits.length - 1]; // sempre 1 dígito
+    return digits[digits.length - 1]; // "10" -> "0"
   }
 
-  /* ===== Coloring ===== */
   applyColor(input) {
     const marked = input.dataset.marked === "1";
     input.className = "cell";
@@ -90,29 +103,22 @@ class MegaSenaGridApp {
     if (colorClass) input.classList.add(colorClass);
   }
 
-  /* ===== Persistence ===== */
   persist() {
     const { rows, cols } = this.getConfig();
     const cells = this.getCells();
-
-    const data = cells.map(cell => ({
-      v: cell.value,
-      m: cell.dataset.marked === "1",
-    }));
+    const data = cells.map(cell => ({ v: cell.value, m: cell.dataset.marked === "1" }));
 
     this.storage.save({ rows, cols, data });
+    this.applyCenterHighlight();
     this.setStatus("Salvo ✅");
     this.setSavedInfo("Salvo localmente");
   }
 
-  /* ===== Grid ===== */
-  getCells() {
-    return [...this.gridEl.querySelectorAll(".cell")];
-  }
+  getCells() { return [...this.gridEl.querySelectorAll(".cell")]; }
 
   buildGrid(rows, cols, savedData = []) {
     this.gridEl.innerHTML = "";
-    this.gridEl.style.gridTemplateColumns = `repeat(${cols}, minmax(42px, 1fr))`;
+    this.gridEl.style.gridTemplateColumns = `repeat(${cols}, 44px)`;
 
     const total = rows * cols;
     for (let i = 0; i < total; i++) {
@@ -131,13 +137,13 @@ class MegaSenaGridApp {
     input.placeholder = " ";
     input.value = saved.v || "";
     input.dataset.index = String(index);
-
+    input.style.caretColor = "transparent";
     if (saved.m) input.dataset.marked = "1";
 
     input.addEventListener("input", () => {
       input.value = this.normalizeDigit(input.value);
       this.applyColor(input);
-      this.persist();
+      this.persistDebounced();
       if (input.value !== "") this.focusNext(index);
     });
 
@@ -173,15 +179,16 @@ class MegaSenaGridApp {
   focusAt(idx) {
     const cells = this.getCells();
     if (idx < 0 || idx >= cells.length) return;
-    cells[idx].focus();
-    try { cells[idx].setSelectionRange(1, 1); } catch {}
+    const el = cells[idx];
+    el.focus();
+    try { el.setSelectionRange(1, 1); } catch {}
   }
   focusNext(idx) { this.focusAt(idx + 1); }
   focusPrev(idx) { this.focusAt(idx - 1); }
   focusDown(idx) { this.focusAt(idx + this.getConfig().cols); }
   focusUp(idx)   { this.focusAt(idx - this.getConfig().cols); }
 
-  /* ===== Helpers de linha/coluna ===== */
+  // ===== crescimento por linhas vazias =====
   isRowEmpty(rowIndex) {
     const { cols } = this.getConfig();
     const cells = this.getCells();
@@ -191,165 +198,149 @@ class MegaSenaGridApp {
     }
     return true;
   }
-
   findFirstEmptyRow() {
     const { rows } = this.getConfig();
     for (let r = 0; r < rows; r++) {
       if (this.isRowEmpty(r)) return r;
     }
-    return rows; // nenhuma vazia -> seria "nova" linha
+    return rows;
   }
-
   ensureRows(minRowsNeeded) {
     const cfg = this.getConfig();
     if (cfg.rows >= minRowsNeeded) return;
 
-    // aumenta input e reconstrói preservando dados
     const oldCells = this.getCells().map(c => ({ v: c.value, m: c.dataset.marked === "1" }));
-    this.rowsEl.value = minRowsNeeded;
+    if (this.rowsEl) this.rowsEl.value = minRowsNeeded;
+
     const { rows, cols } = this.getConfig();
     this.buildGrid(rows, cols, oldCells);
   }
 
-  ensureCols(minColsNeeded) {
-    const cfg = this.getConfig();
-    if (cfg.cols >= minColsNeeded) return;
-
-    const oldCells = this.getCells().map(c => ({ v: c.value, m: c.dataset.marked === "1" }));
-    this.colsEl.value = minColsNeeded;
-    const { rows, cols } = this.getConfig();
-    this.buildGrid(rows, cols, oldCells);
+  // ===== overlay roxo: faixa única bonita =====
+  clearOverlay() {
+    if (!this.overlayEl) return;
+    this.overlayEl.innerHTML = "";
   }
 
-  /* ===== Paste -> Extração por LINHAS com quebra ===== */
-  extractDigitsFromLine(line, mode, includeDate) {
-    let t = String(line || "");
+  getGridMetrics() {
+    const style = getComputedStyle(this.gridEl);
+    const gap = parseFloat(style.gap || style.columnGap || "0") || 0;
 
-    if (!includeDate) {
-      t = t.replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g, " ");
-    }
+    const cell = this.gridEl.querySelector(".cell");
+    const cellSize = cell ? cell.getBoundingClientRect().width : 44;
 
-    if (mode === "last") {
-      const matches = t.match(/\d[\d\.\,]*/g) || [];
-      const out = [];
-      for (const m of matches) {
-        const onlyDigits = m.replace(/[^0-9]/g, "");
-        if (!onlyDigits) continue;
-        out.push(onlyDigits[onlyDigits.length - 1]);
-      }
-      return out;
-    }
-
-    // all
-    return (t.match(/\d/g) || []);
+    return { gap, cellSize };
   }
 
-  fillFromPasteByRows(text) {
+  syncOverlayToGrid() {
+    if (!this.overlayEl || !this.gridEl || !this.gridWrapEl) return;
+
+    const wrapRect = this.gridWrapEl.getBoundingClientRect();
+    const gridRect = this.gridEl.getBoundingClientRect();
+
+    const left = (gridRect.left - wrapRect.left) + this.gridWrapEl.scrollLeft;
+    const top  = (gridRect.top  - wrapRect.top)  + this.gridWrapEl.scrollTop;
+
+    this.overlayEl.style.position = "absolute";
+    this.overlayEl.style.left = `${left}px`;
+    this.overlayEl.style.top = `${top}px`;
+    this.overlayEl.style.width = `${gridRect.width}px`;
+    this.overlayEl.style.height = `${gridRect.height}px`;
+    this.overlayEl.style.pointerEvents = "none";
+    this.overlayEl.style.zIndex = "1";
+    this.overlayEl.style.overflow = "visible";
+  }
+
+  // ✅ ALTERAÇÃO MÍNIMA: não desenha mais a faixa roxa
+  applyCenterHighlight() {
+    // mantém o overlay “limpo” e alinhado
+    this.clearOverlay();
+    this.syncOverlayToGrid();
+
     const { cols } = this.getConfig();
-    const mode = this.extractModeEl.value || "all";
-    const includeDate = !!this.includeDateEl.checked;
-    const append = !!this.appendModeEl.checked;
+    if (cols <= 0) return;
 
-    // pega linhas não vazias
-    const lines = String(text || "")
-      .split(/\r?\n/)
-      .map(l => l.trim())
-      .filter(l => l.length > 0);
+    // pega todos os dígitos preenchidos
+    const digits = this.getCells()
+      .map(c => c.value)
+      .filter(v => v !== "")
+      .map(v => Number(v))
+      .filter(n => Number.isFinite(n));
 
-    if (lines.length === 0) {
-      this.setStatus("Cole pelo menos 1 linha");
+    // se não tiver dígito nenhum, destaca o “meio” (2 colunas centrais)
+    if (!digits.length) {
+      const a = Math.max(0, Math.floor((cols - 1) / 2) - 0);
+      const b = Math.min(cols - 1, a + 1);
+      this.drawCenterBand(a, b);
       return;
     }
 
-    // transforma cada linha em uma lista de dígitos
-    const lineDigits = lines.map(l => this.extractDigitsFromLine(l, mode, includeDate))
-                            .filter(arr => arr.length > 0);
+    const overall = digits.reduce((s, n) => s + n, 0) / digits.length;
 
-    if (lineDigits.length === 0) {
-      this.setStatus("Nenhum dígito encontrado");
-      return;
-    }
+    // média por coluna (ignora vazios)
+    const colMeans = Array.from({ length: cols }, (_, col) => {
+      const colDigits = this.getColumnDigits(col);
+      if (!colDigits.length) return NaN;
+      return colDigits.reduce((s, n) => s + n, 0) / colDigits.length;
+    });
 
-    // Calcula quantas linhas de grid serão necessárias com quebra por colunas
-    // Cada linha colada pode ocupar 1 ou mais linhas do grid (wrap)
-    const rowsNeededForPaste = lineDigits.reduce((sum, arr) => sum + Math.ceil(arr.length / cols), 0);
+    // escolhe o par de colunas ADJACENTES cuja média fica mais próxima da média geral
+    let bestStart = Math.max(0, Math.floor((cols - 1) / 2));
+    let bestDist = Infinity;
 
-    // Decide onde começar
-    let startRow = 0;
-    if (append) startRow = this.findFirstEmptyRow();
-
-    const requiredTotalRows = startRow + rowsNeededForPaste;
-
-    // auto-aumenta linhas se precisar
-    this.ensureRows(requiredTotalRows);
-
-    // agora com grid certo, preenche
-    const cells = this.getCells();
-    const { cols: colsNow } = this.getConfig();
-
-    let currentRow = startRow;
-    let filledCount = 0;
-
-    for (const digitsArr of lineDigits) {
-      let idx = 0;
-
-      while (idx < digitsArr.length) {
-        // garante que existe essa linha
-        // (ensureRows já fez, mas por segurança)
-        const rowStart = currentRow * colsNow;
-
-        for (let c = 0; c < colsNow && idx < digitsArr.length; c++) {
-          const d = digitsArr[idx++];
-          const cell = cells[rowStart + c];
-          if (!cell) break;
-
-          cell.value = this.normalizeDigit(d);
-          this.applyColor(cell);
-          filledCount++;
-        }
-
-        currentRow++; // wrap sempre desce linha quando enche colunas ou termina o bloco
+    for (let c = 0; c < cols - 1; c++) {
+      const a = colMeans[c];
+      const b = colMeans[c + 1];
+      const vals = [a, b].filter(x => Number.isFinite(x));
+      if (!vals.length) continue;
+      const pairMean = vals.reduce((s, n) => s + n, 0) / vals.length;
+      const dist = Math.abs(pairMean - overall);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestStart = c;
       }
     }
 
-    this.persist();
-    this.setStatus(`Preenchido: ${filledCount} dígitos (${lineDigits.length} linhas coladas)`);
-    this.focusAt(startRow * colsNow);
+    const startCol = bestStart;
+    const endCol = Math.min(cols - 1, bestStart + 1);
+    this.drawCenterBand(startCol, endCol);
   }
 
-  /* ===== UI ===== */
+  // ===== UI =====
   bindUI() {
-    this.applyBtn.addEventListener("click", () => {
+    this.applyBtn?.addEventListener("click", () => {
       const { rows, cols } = this.getConfig();
       const current = this.getCells().map(c => ({ v: c.value, m: c.dataset.marked === "1" }));
       this.buildGrid(rows, cols, current);
       this.persist();
+      this.applyCenterHighlight();
     });
 
-    this.addRowBtn.addEventListener("click", () => {
+    this.addRowBtn?.addEventListener("click", () => {
       const cfg = this.getConfig();
       this.ensureRows(cfg.rows + 1);
       this.persist();
-      this.setStatus("Linha adicionada");
+      this.setStatus("Linha +1");
     });
 
-    this.addColBtn.addEventListener("click", () => {
+    this.addColBtn?.addEventListener("click", () => {
       const cfg = this.getConfig();
-      this.ensureCols(cfg.cols + 1);
+      const oldCells = this.getCells().map(c => ({ v: c.value, m: c.dataset.marked === "1" }));
+      if (this.colsEl) this.colsEl.value = cfg.cols + 1;
+
+      const { rows, cols } = this.getConfig();
+      this.buildGrid(rows, cols, oldCells);
       this.persist();
-      this.setStatus("Coluna adicionada");
+      this.setStatus("Coluna +1");
     });
 
-    this.clearBtn.addEventListener("click", () => {
+    this.clearBtn?.addEventListener("click", () => {
       this.storage.clear();
       const { rows, cols } = this.getConfig();
       this.buildGrid(rows, cols, []);
+      this.clearOverlay();
       this.setStatus("Limpo 🧽");
       this.setSavedInfo("Limpo");
-    });
-
-    this.fillFromPasteBtn.addEventListener("click", () => {
-      this.fillFromPasteByRows(this.pasteInputEl.value || "");
     });
   }
 
@@ -366,15 +357,36 @@ class MegaSenaGridApp {
   }
 
   initPrintHooks() {
-    this.printBtn.addEventListener("click", () => {
+    const recalcForPrint = () => {
+      // força um reflow e recalcula após o layout do print aplicar
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.applyCenterHighlight();
+        });
+      });
+    };
+
+    this.printBtn?.addEventListener("click", () => {
       const mode = this.printModeEl?.value || "table_legend";
       if (mode === "table") document.body.classList.add("print-table-only");
       else document.body.classList.remove("print-table-only");
-      window.print();
+
+      // ✅ recalcula a faixa com o layout final antes de imprimir
+      recalcForPrint();
+
+      // ✅ dá tempo pro navegador aplicar @media print, aí imprime
+      setTimeout(() => window.print(), 120);
+    });
+
+    // ✅ quando o navegador entra no modo de impressão (Ctrl+P também)
+    window.addEventListener("beforeprint", () => {
+      recalcForPrint();
     });
 
     window.addEventListener("afterprint", () => {
       document.body.classList.remove("print-table-only");
+      // ✅ volta a recalcular no layout normal
+      this.applyCenterHighlight();
     });
   }
 
@@ -382,19 +394,20 @@ class MegaSenaGridApp {
     const saved = this.storage.load();
 
     if (saved?.rows && saved?.cols) {
-      this.rowsEl.value = saved.rows;
-      this.colsEl.value = saved.cols;
+      if (this.rowsEl) this.rowsEl.value = saved.rows;
+      if (this.colsEl) this.colsEl.value = saved.cols;
       this.buildGrid(saved.rows, saved.cols, saved.data || []);
       this.setStatus("Carregado ✅");
       this.setSavedInfo("Carregado");
+      this.applyCenterHighlight();
       return;
     }
 
     const { rows, cols } = this.getConfig();
     this.buildGrid(rows, cols, []);
     this.setSavedInfo("Novo");
+    this.applyCenterHighlight();
   }
 }
 
-// Boot
-new MegaSenaGridApp("mega_sena_digits_row_fill_v2");
+new MegaSenaGridApp("mega_sena_bolas_faixa_centro_roxa_v10");
